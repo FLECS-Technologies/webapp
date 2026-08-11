@@ -1,18 +1,17 @@
-# Production-like nginx serving the built webapp for smoke-prod tests.
-# Uses public nginx:alpine + our config — the production Dockerfile does
-# the same (COPY dist/ + COPY docker/fs/); our config is the only variable,
-# so this harness gives a faithful read of the headers that will ship.
+# Local harness for the smoke-prod tier: real nginx, real config, built bundle.
+# CI builds the same image but runs it directly, to attach it to the job
+# network. See .github/workflows/smoke-prod.yml.
 services:
   webapp-prod-test:
-    image: nginx:alpine
+    build:
+      context: .
+      dockerfile: docker/test/Dockerfile
+    image: flecs-webapp-prod-test:local
     container_name: flecs-webapp-prod-test
     ports:
       - '8080:80'
-    volumes:
-      - ./dist:/usr/share/nginx/html:ro
-      - ./docker/fs/etc/nginx/conf.d/flecs-webapp.conf:/etc/nginx/conf.d/default.conf:ro
     healthcheck:
-      test: ['CMD', 'wget', '-q', '--spider', 'http://localhost/health']
+      test: ['CMD', 'wget', '-q', '--spider', 'http://127.0.0.1/health']
       interval: 5s
       timeout: 2s
       retries: 10

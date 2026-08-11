@@ -29,9 +29,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: '20'
           cache: 'npm'
@@ -48,18 +48,54 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
+      - name: Build smoke-prod nginx image
+        run: docker build -f docker/test/Dockerfile -t flecs-webapp-prod-test:ci .
+
+      # A published port would land in the host's network namespace, not ours,
+      # so attach the container to our job network and reach it by name.
+      - name: Start nginx
+        id: nginx
+        run: |
+          set -eu
+          net=$(docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$(hostname)" 2>/dev/null | awk '{print $1}' || true)
+          if [ -n "$net" ]; then
+            docker run -d --name flecs-webapp-prod-test \
+              --network "$net" --network-alias flecs-webapp-prod-test \
+              flecs-webapp-prod-test:ci
+            echo 'base_url=http://flecs-webapp-prod-test' >> "$GITHUB_OUTPUT"
+          else
+            # Not containerized: the host namespace is ours.
+            docker run -d --name flecs-webapp-prod-test -p 8080:80 flecs-webapp-prod-test:ci
+            echo 'base_url=http://localhost:8080' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Wait for nginx to report healthy
+        run: |
+          set -eu
+          for _ in $(seq 1 30); do
+            status=$(docker inspect -f '{{.State.Health.Status}}' flecs-webapp-prod-test)
+            [ "$status" = 'healthy' ] && exit 0
+            [ "$status" = 'unhealthy' ] && break
+            sleep 2
+          done
+          echo "nginx did not become healthy (last status: ${status:-unknown})"
+          docker inspect -f '{{range .State.Health.Log}}probe exit={{.ExitCode}}: {{.Output}}{{end}}' flecs-webapp-prod-test
+          docker logs flecs-webapp-prod-test
+          exit 1
+
       - name: Run smoke-prod suite
         run: npm run test:e2e:smoke-prod
         env:
           PW_SMOKE_PROD: 'true'
+          PW_PROD_BASE_URL: ${{ steps.nginx.outputs.base_url }}
 
       - name: Stop test container
         if: always()
-        run: docker compose -f docker-compose.test.yml down
+        run: docker rm -f flecs-webapp-prod-test 2>/dev/null || true
 
       - name: Upload trace artifacts on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
         with:
           name: playwright-report-prod
           path: playwright-report/

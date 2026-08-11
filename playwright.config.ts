@@ -6,6 +6,11 @@ import { defineConfig } from '@playwright/test';
 // production config. CI opts in with PW_SMOKE_PROD=true.
 const PROD_ENABLED = process.env.PW_SMOKE_PROD === 'true';
 
+// Set by CI, which starts nginx itself on the runner's job network and reaches
+// it by container name. Also means "do not start a container here".
+const PROD_BASE_URL = process.env.PW_PROD_BASE_URL ?? 'http://localhost:8080';
+const PROD_EXTERNAL = !!process.env.PW_PROD_BASE_URL;
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: '**/*.spec.ts',
@@ -44,7 +49,7 @@ export default defineConfig({
           {
             name: 'smoke-prod',
             testDir: 'e2e/smoke-prod',
-            use: { baseURL: 'http://localhost:8080' },
+            use: { baseURL: PROD_BASE_URL },
           },
         ]
       : []),
@@ -58,11 +63,12 @@ export default defineConfig({
       ignoreHTTPSErrors: true,
       timeout: 120_000,
     },
-    ...(PROD_ENABLED
+    ...(PROD_ENABLED && !PROD_EXTERNAL
       ? [
           {
-            command: 'docker compose -f docker-compose.test.yml up --wait',
-            url: 'http://localhost:8080/health',
+            // --build: dist/ is baked into the image, not mounted.
+            command: 'docker compose -f docker-compose.test.yml up --build --wait',
+            url: `${PROD_BASE_URL}/health`,
             reuseExistingServer: !process.env.CI,
             timeout: 120_000,
           },
