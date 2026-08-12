@@ -155,6 +155,48 @@ test.describe('@smoke TC24 - instance log dialog', () => {
     await expect(dialog.getByRole('status')).toHaveCount(0);
   });
 
+  test('follows the end of the log unless the reader scrolls back', async ({ page }) => {
+    let logRequests = 0;
+    await page.route('**/api/v2/instances/00000001/logs', (route) => {
+      logRequests += 1;
+      const stdout = Array.from(
+        { length: logRequests * 200 },
+        (_, index) => `line ${String(index + 1).padStart(4, '0')}`,
+      ).join('\n');
+      return route.fulfill({ json: { stdout, stderr: '' }, status: 200 });
+    });
+
+    const dialog = await openLogDialog(page);
+    const logOutput = dialog.getByRole('log');
+    const refresh = dialog.getByRole('button', { name: 'Refresh log' });
+    const scrollTop = () => logOutput.evaluate((output) => output.scrollTop);
+    const atBottom = () =>
+      logOutput.evaluate(
+        (output) =>
+          output.scrollTop > 0 &&
+          output.scrollHeight - output.scrollTop - output.clientHeight <= 24,
+      );
+
+    await expect(logOutput).toContainText('line 0200');
+    await expect.poll(atBottom).toBe(true);
+
+    const firstBottom = await scrollTop();
+    await refresh.click();
+    await expect(logOutput).toContainText('line 0400');
+    await expect(refresh).toBeEnabled();
+    await expect.poll(atBottom).toBe(true);
+    expect(await scrollTop()).toBeGreaterThan(firstBottom);
+
+    await logOutput.evaluate((output) => {
+      output.scrollTop = 0;
+    });
+    await expect.poll(scrollTop).toBe(0);
+    await refresh.click();
+    await expect(logOutput).toContainText('line 0600');
+    await expect(refresh).toBeEnabled();
+    expect(await scrollTop()).toBe(0);
+  });
+
   test('supports dark mode, empty logs, keyboard tabs, and footer dismissal', async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('preferred-theme', 'dark'));
     await page.route('**/api/v2/instances/00000001/logs', (route) =>
