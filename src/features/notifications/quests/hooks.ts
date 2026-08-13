@@ -10,7 +10,6 @@ import { QuestState } from '@generated/core/schemas';
 import {
   useGetQuests,
   useDeleteQuestsId,
-  getQuestsId,
   getGetQuestsIdQueryOptions,
   type getQuestsIdResponse,
   type GetQuestsIdQueryError,
@@ -142,8 +141,12 @@ export function useQuestActions() {
     waitForQuest,
     clearQuests,
     fetchQuest: async (id: number) => {
-      const r = await getQuestsId(id);
-      showQuest(r.data as Quest);
+      const response = await qc.fetchQuery(
+        getGetQuestsIdQueryOptions(id, { query: { staleTime: 0 } }),
+      );
+      const quest = unwrapSuccess(response) as Quest | undefined;
+      if (!quest) throw new Error('Quest request failed');
+      showQuest(quest);
     },
   };
 }

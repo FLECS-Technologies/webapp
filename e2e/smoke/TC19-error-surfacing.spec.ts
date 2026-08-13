@@ -34,5 +34,7 @@ test.describe('@smoke TC19 — error toast shows server reason', () => {
     // The UI should surface the backend reason, not the raw "HTTP 400" message.
     await expect(page.getByText('Corrupt tar archive: unexpected EOF')).toBeVisible();
     await expect(page.getByText(/^HTTP 400$/)).not.toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Restore backup' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Drop a backup here' })).toBeVisible();
   });
 });

@@ -4,7 +4,7 @@ import { Link, useLocation } from 'react-router';
 import { unwrapSuccess } from '@app/api/unwrap';
 import ContentDialog from '@app/components/ContentDialog';
 import { useTenant } from '@app/theme/TenantContext';
-import Import from '@features/system/components/data-transfer/Import';
+import Import, { type ImportHandoffPhase } from '@features/system/components/data-transfer/Import';
 import Export from '@features/system/components/data-transfer/Export';
 import ExportList from '@features/system/components/ExportList';
 import SbomDialog from '@features/system/components/SbomDialog';
@@ -44,7 +44,10 @@ export default function System() {
   const [sbomOpen, setSbomOpen] = React.useState(false);
   const [exportOpen, setExportOpen] = React.useState(false);
   const [restoreOpen, setRestoreOpen] = React.useState(false);
+  const [restoreHandoffPhase, setRestoreHandoffPhase] = React.useState<ImportHandoffPhase>('idle');
   const [onboardingOpen, setOnboardingOpen] = React.useState(false);
+  const [onboardingHandoffPhase, setOnboardingHandoffPhase] =
+    React.useState<ImportHandoffPhase>('idle');
   const { data: infoResponse, isPending: infoPending } = useGetSystemInfo({
     query: { staleTime: 60_000 },
   });
@@ -160,7 +163,10 @@ export default function System() {
           <button
             type="button"
             className="shrink-0 cursor-pointer rounded-md border border-brand bg-surface-raised px-3 py-1.5 text-xs font-medium text-brand transition hover:bg-brand/10"
-            onClick={() => setRestoreOpen(true)}
+            onClick={() => {
+              setRestoreHandoffPhase('idle');
+              setRestoreOpen(true);
+            }}
           >
             Restore backup
           </button>
@@ -175,7 +181,10 @@ export default function System() {
           <button
             type="button"
             className="shrink-0 cursor-pointer rounded-md border border-brand bg-surface-raised px-3 py-1.5 text-xs font-medium text-brand transition hover:bg-brand/10"
-            onClick={() => setOnboardingOpen(true)}
+            onClick={() => {
+              setOnboardingHandoffPhase('idle');
+              setOnboardingOpen(true);
+            }}
           >
             Onboard device
           </button>
@@ -238,61 +247,99 @@ export default function System() {
       <Export open={exportOpen} setOpen={setExportOpen} appTitle={appTitle} />
       <ContentDialog
         open={restoreOpen}
-        setOpen={setRestoreOpen}
+        setOpen={(open) => {
+          setRestoreOpen(open);
+          if (!open) setRestoreHandoffPhase('idle');
+        }}
         title="Restore backup"
         panelClassName="bg-surface-raised rounded-2xl max-w-lg w-[calc(100%-2rem)] max-h-[90vh] flex flex-col shadow-2xl border border-border"
+        actions={restoreHandoffPhase === 'idle' ? undefined : null}
+        dismissible={restoreHandoffPhase === 'idle'}
       >
         <div className="space-y-4 p-1">
-          <div>
-            <p className="text-sm font-medium">Choose a backup archive</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              Restore apps and configuration from a backup created by FLECS.
-            </p>
-          </div>
-          <div className="[&_[data-testid=import-dropzone]]:min-h-32 [&_[data-testid=import-dropzone]]:cursor-pointer [&_[data-testid=import-dropzone]]:justify-center [&_[data-testid=import-dropzone]]:py-8 [&_[data-testid=import-dropzone]]:text-center">
+          {restoreHandoffPhase === 'idle' && (
+            <div>
+              <p className="text-sm font-medium">Choose a backup archive</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Restore apps and configuration from a backup created by FLECS.
+              </p>
+            </div>
+          )}
+          <div
+            className={
+              restoreHandoffPhase === 'idle'
+                ? '[&_[data-testid=import-dropzone]]:min-h-32 [&_[data-testid=import-dropzone]]:cursor-pointer [&_[data-testid=import-dropzone]]:justify-center [&_[data-testid=import-dropzone]]:py-8 [&_[data-testid=import-dropzone]]:text-center'
+                : ''
+            }
+          >
             <Import
               dropzone
               mode="restore"
               buttonText="Drop a backup here"
-              onImportStarted={() => setRestoreOpen(false)}
+              onHandoffPhaseChange={setRestoreHandoffPhase}
+              onImportStarted={() => {
+                setRestoreOpen(false);
+                setRestoreHandoffPhase('idle');
+              }}
             />
           </div>
-          <p className="text-xs text-muted">Accepts .tar and .tar.gz files.</p>
+          {restoreHandoffPhase === 'idle' && (
+            <p className="text-xs text-muted">Accepts .tar and .tar.gz files.</p>
+          )}
         </div>
       </ContentDialog>
       <ContentDialog
         open={onboardingOpen}
-        setOpen={setOnboardingOpen}
+        setOpen={(open) => {
+          setOnboardingOpen(open);
+          if (!open) setOnboardingHandoffPhase('idle');
+        }}
         title="Onboard device"
         panelClassName="bg-surface-raised rounded-2xl max-w-lg w-[calc(100%-2rem)] max-h-[90vh] flex flex-col shadow-2xl border border-border"
+        actions={onboardingHandoffPhase === 'idle' ? undefined : null}
+        dismissible={onboardingHandoffPhase === 'idle'}
       >
         <div className="space-y-4 p-1">
-          <div>
-            <p className="text-sm font-medium">Choose an apps.json file</p>
-            <p className="mt-1 text-xs leading-relaxed text-muted">
-              Upload the apps.json created by the Device Onboarding Service (D-O-S).
-            </p>
-          </div>
-          <div className="[&_[data-testid=import-dropzone]]:min-h-32 [&_[data-testid=import-dropzone]]:cursor-pointer [&_[data-testid=import-dropzone]]:justify-center [&_[data-testid=import-dropzone]]:py-8 [&_[data-testid=import-dropzone]]:text-center">
+          {onboardingHandoffPhase === 'idle' && (
+            <div>
+              <p className="text-sm font-medium">Choose an apps.json file</p>
+              <p className="mt-1 text-xs leading-relaxed text-muted">
+                Upload the apps.json created by the Device Onboarding Service (D-O-S).
+              </p>
+            </div>
+          )}
+          <div
+            className={
+              onboardingHandoffPhase === 'idle'
+                ? '[&_[data-testid=import-dropzone]]:min-h-32 [&_[data-testid=import-dropzone]]:cursor-pointer [&_[data-testid=import-dropzone]]:justify-center [&_[data-testid=import-dropzone]]:py-8 [&_[data-testid=import-dropzone]]:text-center'
+                : ''
+            }
+          >
             <Import
               dropzone
               mode="onboard"
               buttonText="Drop apps.json here"
-              onImportStarted={() => setOnboardingOpen(false)}
+              onHandoffPhaseChange={setOnboardingHandoffPhase}
+              onImportStarted={() => {
+                setOnboardingOpen(false);
+                setOnboardingHandoffPhase('idle');
+              }}
             />
           </div>
-          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-            <span>Accepts apps.json files.</span>
-            <a
-              href={onboardingDocsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
-            >
-              How to create apps.json
-              <ExternalLink size={12} />
-            </a>
-          </div>
+          {onboardingHandoffPhase === 'idle' && (
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+              <span>Accepts apps.json files.</span>
+              <a
+                href={onboardingDocsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
+              >
+                How to create apps.json
+                <ExternalLink size={12} />
+              </a>
+            </div>
+          )}
         </div>
       </ContentDialog>
     </div>

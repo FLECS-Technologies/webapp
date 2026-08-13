@@ -10,6 +10,7 @@ interface ContentDialogProps {
   panelClassName?: string;
   contentClassName?: string;
   headerCloseButton?: boolean;
+  dismissible?: boolean;
 }
 
 type OpenContentDialogProps = Omit<ContentDialogProps, 'open'>;
@@ -22,6 +23,7 @@ function OpenContentDialog({
   panelClassName,
   contentClassName,
   headerCloseButton = false,
+  dismissible = true,
 }: OpenContentDialogProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -34,7 +36,12 @@ function OpenContentDialog({
     <dialog
       ref={ref}
       aria-labelledby={titleId}
-      onClose={() => setOpen(false)}
+      onCancel={(event) => {
+        if (!dismissible) event.preventDefault();
+      }}
+      onClose={() => {
+        if (dismissible) setOpen(false);
+      }}
       className="m-auto w-[min(896px,94vw)] max-w-none overflow-visible bg-transparent p-0 text-text-primary backdrop:bg-black/60"
     >
       <div
@@ -53,27 +60,33 @@ function OpenContentDialog({
               aria-label="Close dialog"
               className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted transition hover:bg-surface-hover hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
               onClick={() => setOpen(false)}
+              disabled={!dismissible}
             >
               <X size={18} />
             </button>
           )}
         </div>
         <div
-          className={contentClassName ?? 'flex-1 overflow-auto border-b border-border px-6 py-4'}
+          className={
+            contentClassName ??
+            `flex-1 overflow-auto px-6 py-4 ${actions === null ? '' : 'border-b border-border'}`
+          }
         >
           {children ?? <p className="text-sm text-muted">No content to display.</p>}
         </div>
-        <div className="flex justify-end gap-2 px-6 py-3">
-          {actions ?? (
-            <button
-              type="button"
-              className="cursor-pointer rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand/10"
-              onClick={() => setOpen(false)}
-            >
-              Close
-            </button>
-          )}
-        </div>
+        {actions !== null && (
+          <div className="flex justify-end gap-2 px-6 py-3">
+            {actions ?? (
+              <button
+                type="button"
+                className="cursor-pointer rounded-lg border border-brand px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand/10"
+                onClick={() => setOpen(false)}
+              >
+                Close
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </dialog>
   );

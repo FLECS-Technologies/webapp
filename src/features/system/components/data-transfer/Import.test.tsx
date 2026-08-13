@@ -52,7 +52,67 @@ describe('Import dropzone', () => {
     await waitFor(() =>
       expect(apiMocks.restoreBackup).toHaveBeenCalledWith({ data: { file: tar } }),
     );
-    expect(onImportStarted).toHaveBeenCalledOnce();
+    expect(await screen.findByText('Restore job started')).toBeVisible();
+    fireEvent.animationEnd(screen.getByTestId('import-confirmation'));
+    await waitFor(() => expect(onImportStarted).toHaveBeenCalledOnce());
+  });
+
+  it('keeps the customer informed until the restore job is visible', async () => {
+    let acceptRestore:
+      | ((response: { status: number; data: { jobId: number } }) => void)
+      | undefined;
+    apiMocks.restoreBackup.mockReturnValue(
+      new Promise((resolve) => {
+        acceptRestore = resolve;
+      }),
+    );
+    const onImportStarted = vi.fn();
+    const onHandoffPhaseChange = vi.fn();
+    renderWithProviders(
+      <Import
+        dropzone
+        mode="restore"
+        onImportStarted={onImportStarted}
+        onHandoffPhaseChange={onHandoffPhaseChange}
+      />,
+    );
+
+    const tar = new File(['x'], 'factory-line-backup.tar', { type: 'application/x-tar' });
+    fireEvent.drop(screen.getByTestId('import-dropzone'), { dataTransfer: { files: [tar] } });
+
+    expect(await screen.findByText('Uploading backup')).toBeVisible();
+    expect(screen.getByText('factory-line-backup.tar')).toBeVisible();
+    expect(onImportStarted).not.toHaveBeenCalled();
+    expect(onHandoffPhaseChange).toHaveBeenLastCalledWith('uploading');
+
+    acceptRestore?.({ status: 202, data: { jobId: 1 } });
+
+    expect(await screen.findByText('Restore job started')).toBeVisible();
+    expect(onHandoffPhaseChange).toHaveBeenLastCalledWith('accepted');
+    expect(onImportStarted).not.toHaveBeenCalled();
+    fireEvent.animationEnd(screen.getByTestId('import-confirmation'));
+    await waitFor(() => expect(onImportStarted).toHaveBeenCalledOnce());
+  });
+
+  it('returns to file selection when the restore request fails', async () => {
+    apiMocks.restoreBackup.mockRejectedValue(new Error('Upload rejected'));
+    const onImportStarted = vi.fn();
+    const onHandoffPhaseChange = vi.fn();
+    renderWithProviders(
+      <Import
+        dropzone
+        mode="restore"
+        onImportStarted={onImportStarted}
+        onHandoffPhaseChange={onHandoffPhaseChange}
+      />,
+    );
+
+    const tar = new File(['x'], 'broken-backup.tar', { type: 'application/x-tar' });
+    fireEvent.drop(screen.getByTestId('import-dropzone'), { dataTransfer: { files: [tar] } });
+
+    expect(await screen.findByTestId('import-dropzone')).toBeVisible();
+    expect(onHandoffPhaseChange).toHaveBeenLastCalledWith('idle');
+    expect(onImportStarted).not.toHaveBeenCalled();
   });
 
   it('opens the file picker from the entire dropzone', async () => {
