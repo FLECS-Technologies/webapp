@@ -12,7 +12,6 @@ export const customInstance = async <T>(url: string, options?: RequestInit): Pro
       ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
       ...(options?.headers as Record<string, string>),
     },
-    signal: options?.signal ?? AbortSignal.timeout(15_000),
   });
 
   const contentType = response.headers.get('content-type');

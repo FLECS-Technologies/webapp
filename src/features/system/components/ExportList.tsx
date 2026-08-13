@@ -1,16 +1,15 @@
 import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Archive, Download, Trash2 } from 'lucide-react';
 import {
   useGetExports,
   useDeleteExportsExportId,
-  getExportsExportId,
+  getGetExportsExportIdQueryOptions,
 } from '@generated/core/flecsport/flecsport';
 import type { ExportId } from '@generated/core/schemas';
 
-// Export tarballs can be large; allow up to 10 min to transfer before aborting.
-const DOWNLOAD_TIMEOUT_MS = 10 * 60_000;
-
 export default function ExportList() {
+  const queryClient = useQueryClient();
   const { data: exportsResponse, isLoading: loading, isError, refetch } = useGetExports();
   const { mutateAsync: deleteExport } = useDeleteExportsExportId();
   const [error, setError] = useState<string | null>(null);
@@ -20,12 +19,9 @@ export default function ExportList() {
 
   const handleDownload = async (exportId: string) => {
     setDownloading(exportId);
+    const queryOptions = getGetExportsExportIdQueryOptions(exportId);
     try {
-      // Exports can be large; the shared customInstance default caps requests at
-      // 15s, which aborts big downloads. Give this blob fetch a generous cap.
-      const response = await getExportsExportId(exportId, {
-        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
-      });
+      const response = await queryClient.fetchQuery(queryOptions);
       const blob = response.data as Blob;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -37,6 +33,8 @@ export default function ExportList() {
       window.URL.revokeObjectURL(url);
     } catch {
       setError('Download failed');
+    } finally {
+      queryClient.removeQueries({ queryKey: queryOptions.queryKey, exact: true });
     }
     setDownloading(null);
   };

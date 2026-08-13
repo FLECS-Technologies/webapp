@@ -55,7 +55,6 @@ export const customInstance = async <T>(url: string, options?: RequestInit): Pro
       ...(options?.headers as Record<string, string>),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
-    signal: options?.signal ?? AbortSignal.timeout(15_000),
   });
 
   const ct = response.headers.get('content-type') ?? '';
