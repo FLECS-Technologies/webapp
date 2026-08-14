@@ -123,6 +123,7 @@ jobs:
           printf 'ref=%s\n' "${NAME%:*}@${DIGEST}" >>"$GITHUB_OUTPUT"
 
       - name: Install cosign
+        if: ${{ inputs.sign && !inputs.dry_run }}
         run: |
           COSIGN_VERSION=v3.0.6
           curl -sfL -o cosign \
