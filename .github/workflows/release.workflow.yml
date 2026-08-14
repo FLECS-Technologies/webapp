@@ -1,9 +1,8 @@
 name: Release
 
-# Pushes the release images (x.y.z, vx.y.z, latest) for a published release.
-# A published pre-release runs this workflow as a dry-run instead, proving the
-# release path before the real tag exists. Its rc images come from
-# prerelease.workflow.yml.
+# Pushes the release images (x.y.z, vx.y.z, latest) for a published final
+# release. Pre-releases are handled entirely by prerelease.workflow.yml, which
+# also dry-runs this path so it is proven before the real tag exists.
 on:
   release:
     types: [published]
@@ -11,21 +10,17 @@ on:
 jobs:
   verify:
     name: Verify release
+    if: ${{ !github.event.release.prerelease }}
     uses: ./.github/workflows/verify-release.yml
-    with:
-      tag: ${{ github.event.release.tag_name }}
-      prerelease: ${{ github.event.release.prerelease }}
 
   build-and-push:
-    name: Build and push latest ${{ github.event.release.prerelease && '(dry-run)' || '' }}
+    name: Build and push latest
     needs: verify
     uses: ./.github/workflows/build-and-push.yml
     with:
-      # No version_suffix, so the dry-run builds the exact tags it would push
-      # and only the push itself is skipped.
+      # No version_suffix: a final release is tagged x.y.z with nothing appended.
       make_target: release-build
       named_tag: latest
-      dry_run: ${{ github.event.release.prerelease }}
       assert_clean: true
       sign: true
     secrets: inherit
