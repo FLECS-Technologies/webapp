@@ -2,9 +2,7 @@ name: Prerelease
 
 # Pushes real release-build images for a published pre-release, versioned from
 # the tag (x.y.z-rc[.n], vx.y.z-rc[.n]) plus the moving "rc" tag.
-#
-# The dry-run of the release path runs in parallel, in release.workflow.yml,
-# which fires on the same event.
+# release.workflow.yml fires on the same event and dry-runs the release path.
 on:
   release:
     types: [published]
@@ -27,4 +25,5 @@ jobs:
       version_suffix: ${{ needs.verify.outputs.version_suffix }}
       named_tag: rc
       assert_clean: true
+      sign: true
     secrets: inherit

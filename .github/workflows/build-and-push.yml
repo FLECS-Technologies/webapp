@@ -23,6 +23,10 @@ on:
         description: Fail if the build dirtied the worktree, which would bake "-dirty" into the version
         type: boolean
         default: false
+      sign:
+        description: Sign the pushed image with cosign, keyed by Azure Key Vault via OIDC
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -61,6 +65,8 @@ jobs:
   docker:
     needs: build
     runs-on: ubuntu-24.04
+    # Required so the Sign step can mint an OIDC token for Azure federated auth.
+    enable-openid-connect: true
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -91,6 +97,7 @@ jobs:
         run: echo "value=$(cat package.json | jq -r '.version')${{ inputs.version_suffix }}" >> "$GITHUB_OUTPUT"
 
       - name: Build ${{ inputs.dry_run && '(dry-run, no push)' || 'and push' }}
+        id: bake
         uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
         env:
           VERSION: ${{ steps.version.outputs.value }}
@@ -99,3 +106,64 @@ jobs:
           source: .
           files: docker-bake.hcl
           push: ${{ !inputs.dry_run }}
+
+      # Sign by digest so one signature covers every tag on this manifest.
+      # A dry-run pushes nothing, so there is no digest to sign.
+      - name: Resolve pushed digest
+        id: image
+        if: ${{ inputs.sign && !inputs.dry_run }}
+        env:
+          METADATA: ${{ steps.bake.outputs.metadata }}
+        run: |
+          set -eu
+          DIGEST="$(printf '%s' "$METADATA" | jq -er '.webapp["containerimage.digest"]')"
+          # Take the repository from the tags bake pushed so it cannot drift from
+          # docker-bake.hcl. Strips the trailing ":tag" but keeps a registry port.
+          NAME="$(printf '%s' "$METADATA" | jq -er '.webapp["image.name"]' | cut -d, -f1)"
+          printf 'ref=%s\n' "${NAME%:*}@${DIGEST}" >>"$GITHUB_OUTPUT"
+
+      - name: Install cosign
+        run: |
+          COSIGN_VERSION=v3.0.6
+          curl -sfL -o cosign \
+            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+          curl -sfL -o cosign.sig \
+            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64.sig"
+          curl -sfL -o cosign.pem \
+            "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64.pem"
+          openssl dgst -sha256 -verify <(openssl x509 -in cosign.pem -pubkey -noout) \
+            -signature cosign.sig cosign
+          chmod +x cosign
+          sudo mv cosign /usr/local/bin/cosign
+
+      - name: Sign image
+        if: ${{ inputs.sign && !inputs.dry_run }}
+        env:
+          REF: ${{ steps.image.outputs.ref }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          # Signing key in Azure Key Vault, as a cosign key URI.
+          SIGN_KEY_URI: ${{ secrets.SIGN_KEY_URI }}
+        run: |
+          set -eu
+          TOKEN="$(curl -sf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" \
+            | jq -r '.value')"
+          if [ -z "$TOKEN" ] || [ "$TOKEN" = "null" ]; then
+            echo "::error::Could not mint an OIDC token for Azure federated auth"
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+
+          AZURE_FEDERATED_TOKEN_FILE="${RUNNER_TEMP:-/tmp}/oidc-token.jwt"
+          export AZURE_FEDERATED_TOKEN_FILE
+          printf '%s' "$TOKEN" >"$AZURE_FEDERATED_TOKEN_FILE"
+
+          # Registry credentials come from the config docker/login-action wrote
+          # for this job. Key-based with no transparency log entry, which keeps
+          # verification on the widely supported path.
+          cosign sign --yes \
+            --use-signing-config=false \
+            --tlog-upload=false \
+            --key "$SIGN_KEY_URI" \
+            "$REF"

@@ -1,12 +1,8 @@
 name: Verify Release
 
-# Guard rails shared by the release and prerelease workflows. Everything here is
-# a hard gate: if any assertion fails, no image is built and nothing is pushed.
-#
-#   - the tagged worktree is clean (a dirty tree would bake "-dirty" into
-#     VITE_APP_VERSION, see resolveAppVersion() in vite.config.ts)
-#   - the tag agrees with the version in package.json
-#   - pre-releases are tagged "-rc" or "-rc.<n>", releases carry no suffix
+# Hard gate for the release and prerelease workflows: on any failure nothing is
+# built and nothing is pushed. A dirty worktree matters because it bakes
+# "-dirty" into VITE_APP_VERSION, see resolveAppVersion() in vite.config.ts.
 on:
   workflow_call:
     inputs:
@@ -58,7 +54,7 @@ jobs:
         run: |
           set -eu
           VERSION="$(jq -r '.version' package.json)"
-          # Tags are written with a leading "v"; compare on the bare version.
+          # Strip an optional leading "v" and compare on the bare version.
           TAG_VERSION="${TAG#v}"
 
           if [ "${PRERELEASE}" = "true" ]; then
