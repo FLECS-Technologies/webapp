@@ -45,12 +45,15 @@ jobs:
       - name: build
         run: make ${{ inputs.make_target }}
 
+      # Checked after the build so it covers both a workspace that started dirty
+      # and a build that dirtied it, since either bakes "-dirty" into the version.
+      # See resolveAppVersion() in vite.config.ts.
       - name: Assert clean worktree
         if: ${{ inputs.assert_clean }}
         run: |
           set -eu
           if [ -n "$(git status --porcelain)" ]; then
-            echo "::error::Build dirtied the worktree, so the baked version carries '-dirty'"
+            echo "::error::Worktree is not clean, so the baked version carries '-dirty'"
             git status --porcelain
             exit 1
           fi

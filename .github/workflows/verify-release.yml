@@ -1,11 +1,9 @@
 name: Verify Release
 
 # Hard gate for the release and prerelease workflows: on any failure nothing is
-# built and nothing is pushed. A dirty worktree matters because it bakes
-# "-dirty" into VITE_APP_VERSION, see resolveAppVersion() in vite.config.ts.
-# The tag and the pre-release flag are read from the run context rather than
-# passed in, because a caller's with: clause is evaluated while the workflow is
-# expanded, before the event payload is available.
+# built and nothing is pushed. The tag and the pre-release flag are read from the
+# run context rather than passed in, because a caller's with: clause is evaluated
+# while the workflow is expanded, before the event payload is available.
 on:
   workflow_call:
     outputs:
@@ -27,18 +25,6 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.ref }}
-
-      - name: Assert clean worktree
-        env:
-          TAG: ${{ github.ref_name }}
-        run: |
-          set -eu
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "::error::Worktree is not clean at ${TAG}"
-            git status --porcelain
-            exit 1
-          fi
-          echo "Worktree at ${TAG} is clean"
 
       - name: Verify tag against package.json
         id: verify
