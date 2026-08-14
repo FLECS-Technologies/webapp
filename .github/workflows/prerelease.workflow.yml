@@ -16,6 +16,10 @@ jobs:
   build-and-push:
     name: Build and push rc
     needs: verify
+    # Repeated because Forgejo propagates only failure and cancellation through
+    # needs: a skipped dependency counts as done, so a job without its own
+    # condition would run anyway.
+    if: ${{ github.event.release.prerelease }}
     uses: ./.github/workflows/build-and-push.yml
     with:
       make_target: release-build
@@ -28,6 +32,7 @@ jobs:
   dry-run-release:
     name: Dry-run the release path
     needs: verify
+    if: ${{ github.event.release.prerelease }}
     uses: ./.github/workflows/build-and-push.yml
     with:
       # Builds the exact tags a final release would push, then skips the push.
