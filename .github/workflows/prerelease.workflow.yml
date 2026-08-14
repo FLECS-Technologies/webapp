@@ -1,0 +1,30 @@
+name: Prerelease
+
+# Pushes real release-build images for a published pre-release, versioned from
+# the tag (x.y.z-rc[.n], vx.y.z-rc[.n]) plus the moving "rc" tag.
+#
+# The dry-run of the release path runs in parallel, in release.workflow.yml,
+# which fires on the same event.
+on:
+  release:
+    types: [published]
+
+jobs:
+  verify:
+    name: Verify pre-release
+    if: ${{ github.event.release.prerelease }}
+    uses: ./.github/workflows/verify-release.yml
+    with:
+      tag: ${{ github.event.release.tag_name }}
+      prerelease: true
+
+  build-and-push:
+    name: Build and push rc
+    needs: verify
+    uses: ./.github/workflows/build-and-push.yml
+    with:
+      make_target: release-build
+      version_suffix: ${{ needs.verify.outputs.version_suffix }}
+      named_tag: rc
+      assert_clean: true
+    secrets: inherit

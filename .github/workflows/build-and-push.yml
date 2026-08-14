@@ -15,6 +15,14 @@ on:
       named_tag:
         type: string
         required: true
+      dry_run:
+        description: Build everything but skip the registry push
+        type: boolean
+        default: false
+      assert_clean:
+        description: Fail if the build dirtied the worktree, which would bake "-dirty" into the version
+        type: boolean
+        default: false
 
 jobs:
   build:
@@ -32,6 +40,16 @@ jobs:
 
       - name: build
         run: make ${{ inputs.make_target }}
+
+      - name: Assert clean worktree
+        if: ${{ inputs.assert_clean }}
+        run: |
+          set -eu
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Build dirtied the worktree, so the baked version carries '-dirty'"
+            git status --porcelain
+            exit 1
+          fi
 
       - name: archive raw artifacts
         uses: actions/upload-artifact@c6a366c94c3e0affe28c06c8df20a878f24da3cf # v3.2.2
@@ -72,7 +90,7 @@ jobs:
         id: version
         run: echo "value=$(cat package.json | jq -r '.version')${{ inputs.version_suffix }}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push
+      - name: Build ${{ inputs.dry_run && '(dry-run, no push)' || 'and push' }}
         uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
         env:
           VERSION: ${{ steps.version.outputs.value }}
@@ -80,4 +98,4 @@ jobs:
         with:
           source: .
           files: docker-bake.hcl
-          push: true
+          push: ${{ !inputs.dry_run }}

@@ -1,0 +1,88 @@
+name: Verify Release
+
+# Guard rails shared by the release and prerelease workflows. Everything here is
+# a hard gate: if any assertion fails, no image is built and nothing is pushed.
+#
+#   - the tagged worktree is clean (a dirty tree would bake "-dirty" into
+#     VITE_APP_VERSION, see resolveAppVersion() in vite.config.ts)
+#   - the tag agrees with the version in package.json
+#   - pre-releases are tagged "-rc" or "-rc.<n>", releases carry no suffix
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag the release was published from
+        type: string
+        required: true
+      prerelease:
+        description: Whether the release is flagged as a pre-release
+        type: boolean
+        required: true
+    outputs:
+      version:
+        description: Base version from package.json, e.g. "5.3.0"
+        value: ${{ jobs.verify.outputs.version }}
+      version_suffix:
+        description: Image tag suffix, "" for releases and "-rc[.n]" for pre-releases
+        value: ${{ jobs.verify.outputs.version_suffix }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.verify.outputs.version }}
+      version_suffix: ${{ steps.verify.outputs.version_suffix }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Assert clean worktree
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -eu
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Worktree is not clean at ${TAG}"
+            git status --porcelain
+            exit 1
+          fi
+          echo "Worktree at ${TAG} is clean"
+
+      - name: Verify tag against package.json
+        id: verify
+        env:
+          TAG: ${{ inputs.tag }}
+          PRERELEASE: ${{ inputs.prerelease }}
+        run: |
+          set -eu
+          VERSION="$(jq -r '.version' package.json)"
+          # Tags are written with a leading "v"; compare on the bare version.
+          TAG_VERSION="${TAG#v}"
+
+          if [ "${PRERELEASE}" = "true" ]; then
+            if ! printf '%s\n' "${TAG_VERSION}" \
+              | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-rc(\.[0-9]+)?$'; then
+              echo "::error::Pre-release tag '${TAG}' must be 'v<x>.<y>.<z>-rc' or 'v<x>.<y>.<z>-rc.<n>'"
+              exit 1
+            fi
+            BASE="${TAG_VERSION%%-rc*}"
+            SUFFIX="${TAG_VERSION#"${BASE}"}"
+          else
+            if ! printf '%s\n' "${TAG_VERSION}" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Release tag '${TAG}' must be 'v<x>.<y>.<z>' with no suffix; use a pre-release for '-rc' tags"
+              exit 1
+            fi
+            BASE="${TAG_VERSION}"
+            SUFFIX=""
+          fi
+
+          if [ "${BASE}" != "${VERSION}" ]; then
+            echo "::error::Tag '${TAG}' does not match package.json version '${VERSION}'"
+            exit 1
+          fi
+
+          echo "Tag '${TAG}' matches package.json version '${VERSION}'"
+          printf 'version=%s\n' "${VERSION}" >>"$GITHUB_OUTPUT"
+          printf 'version_suffix=%s\n' "${SUFFIX}" >>"$GITHUB_OUTPUT"
