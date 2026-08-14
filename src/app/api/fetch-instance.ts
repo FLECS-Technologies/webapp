@@ -1,5 +1,6 @@
 import { getBaseURL } from '@app/api/ApiProvider';
 import { FetchError } from './fetch-error';
+import { type TimedRequestInit, withRequestTimeout } from './request-timeout';
 
 // Token is stored in localStorage by AuthProvider (OAuth PKCE → upstream Keycloak).
 // flecs-core only accepts Authorization: Bearer <jwt> — no cookie session exists
@@ -43,18 +44,20 @@ function clearStoredAuthAndReload() {
   window.location.href = window.location.origin + window.location.pathname;
 }
 
-export const customInstance = async <T>(url: string, options?: RequestInit): Promise<T> => {
+export const customInstance = async <T>(url: string, options?: TimedRequestInit): Promise<T> => {
+  const { timeout, signal, ...requestOptions } = options ?? {};
   // Only force JSON Content-Type for string bodies. FormData/Blob need the
   // browser to set multipart/octet-stream with the correct boundary.
-  const isJsonBody = typeof options?.body === 'string';
+  const isJsonBody = typeof requestOptions.body === 'string';
   const accessToken = getAccessToken();
   const response = await fetch(`${getBaseURL()}${url}`, {
-    ...options,
+    ...requestOptions,
     headers: {
       ...(isJsonBody ? { 'Content-Type': 'application/json' } : {}),
-      ...(options?.headers as Record<string, string>),
+      ...(requestOptions.headers as Record<string, string>),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
     },
+    signal: withRequestTimeout(signal, timeout),
   });
 
   const ct = response.headers.get('content-type') ?? '';

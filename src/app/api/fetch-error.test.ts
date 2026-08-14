@@ -11,8 +11,15 @@
  */
 import { describe, it, expect } from 'vitest';
 import { FetchError, getErrorMessage } from './fetch-error';
+import { REQUEST_TIMEOUT_MESSAGE } from './request-timeout';
 
 describe('getErrorMessage', () => {
+  it('turns the platform timeout into actionable feedback', () => {
+    expect(getErrorMessage(new DOMException('The operation timed out', 'TimeoutError'))).toBe(
+      REQUEST_TIMEOUT_MESSAGE,
+    );
+  });
+
   it('prefers FetchError.data.additionalInfo (camelCase — what flecs-core emits)', () => {
     const err = new FetchError(500, { additionalInfo: 'license key 403' }, new Headers());
     expect(getErrorMessage(err)).toBe('license key 403');

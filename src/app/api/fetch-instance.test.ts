@@ -74,17 +74,20 @@ describe('customInstance Authorization header', () => {
     expect(headersOf().has('Authorization')).toBe(false);
   });
 
-  it('does not add a request signal when Orval provides none', async () => {
+  it('applies the standard request deadline when Orval provides no signal', async () => {
     await customInstance('/foo');
 
-    expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBeUndefined();
+    expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(AbortSignal);
   });
 
-  it('forwards the request signal supplied through Orval options', async () => {
+  it('composes the Orval/TanStack signal with the standard request deadline', async () => {
     const controller = new AbortController();
 
     await customInstance('/foo', { signal: controller.signal });
 
-    expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBe(controller.signal);
+    const requestSignal = (fetchMock.mock.calls[0][1] as RequestInit).signal;
+    expect(requestSignal).not.toBe(controller.signal);
+    controller.abort();
+    expect(requestSignal?.aborted).toBe(true);
   });
 });

@@ -4,6 +4,7 @@ import { Archive, FolderDown, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import ContentDialog from '@app/components/ContentDialog';
 import { getErrorMessage } from '@app/api/fetch-error';
+import { LONG_REQUEST_TIMEOUT_MS } from '@app/api/request-timeout';
 import { unwrapSuccess } from '@app/api/unwrap';
 import { useTenant } from '@app/theme/TenantContext';
 import { enrichInstalledApps } from '@features/apps/app-queries';
@@ -203,6 +204,7 @@ export default function Export({ open, setOpen, appTitle }: ExportProps) {
       const downloadResponse = await queryClient.fetchQuery(
         getGetExportsExportIdQueryOptions(result.result, {
           query: { retry: false, staleTime: Infinity },
+          request: { timeout: LONG_REQUEST_TIMEOUT_MS },
         }),
       );
       const blob = unwrapSuccess(downloadResponse);

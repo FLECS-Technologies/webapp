@@ -7,6 +7,7 @@ import {
   getGetExportsExportIdQueryOptions,
 } from '@generated/core/flecsport/flecsport';
 import type { ExportId } from '@generated/core/schemas';
+import { LONG_REQUEST_TIMEOUT_MS } from '@app/api/request-timeout';
 
 export default function ExportList() {
   const queryClient = useQueryClient();
@@ -19,7 +20,9 @@ export default function ExportList() {
 
   const handleDownload = async (exportId: string) => {
     setDownloading(exportId);
-    const queryOptions = getGetExportsExportIdQueryOptions(exportId);
+    const queryOptions = getGetExportsExportIdQueryOptions(exportId, {
+      request: { timeout: LONG_REQUEST_TIMEOUT_MS },
+    });
     try {
       const response = await queryClient.fetchQuery(queryOptions);
       const blob = response.data as Blob;

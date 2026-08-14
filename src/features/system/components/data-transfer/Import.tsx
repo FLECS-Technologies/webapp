@@ -29,6 +29,7 @@ import { usePostImports } from '@generated/core/flecsport/flecsport';
 import { getGetQuestsQueryKey } from '@generated/core/quests/quests';
 import { unwrapSuccess } from '@app/api/unwrap';
 import { getErrorMessage } from '@app/api/fetch-error';
+import { LONG_REQUEST_TIMEOUT_MS } from '@app/api/request-timeout';
 
 interface ImportProps extends React.ComponentProps<'button'> {
   /** Render as a drag-and-drop zone (dashed container) instead of a bare button. */
@@ -137,7 +138,9 @@ export default function Import(props: ImportProps) {
   const qc = useQueryClient();
   const { fetchQuest, waitForQuest } = useQuestActions();
   const onboardingMutation = usePostDeviceOnboarding();
-  const backupMutation = usePostImports();
+  const backupMutation = usePostImports({
+    request: { timeout: LONG_REQUEST_TIMEOUT_MS },
+  });
   const dropzoneInputRef = React.useRef<HTMLInputElement>(null);
   const confirmationResolverRef = React.useRef<(() => void) | null>(null);
   const [handoff, setHandoff] = React.useState<ImportHandoffState>({ phase: 'idle' });

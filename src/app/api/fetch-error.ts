@@ -2,6 +2,8 @@
  * Typed error class for non-2xx HTTP responses.
  * Orval picks up the ErrorType export to wire TError in generated hooks.
  */
+import { REQUEST_TIMEOUT_MESSAGE } from './request-timeout';
+
 export class FetchError<T = unknown> extends Error {
   readonly status: number;
   readonly data: T;
@@ -23,6 +25,14 @@ export class FetchError<T = unknown> extends Error {
  * it as `additional_info`, so we check both.
  */
 export function getErrorMessage(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    error.name === 'TimeoutError'
+  ) {
+    return REQUEST_TIMEOUT_MESSAGE;
+  }
   if (error instanceof FetchError) {
     const serverMsg = extractServerMessage(error.data);
     if (serverMsg) return serverMsg;
