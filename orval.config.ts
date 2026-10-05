@@ -9,6 +9,8 @@ export default defineConfig({
           allow: [
             'https://raw.githubusercontent.com/FLECS-Technologies/app-manifest/refs/heads/3.1.0/manifest.schema.json',
             'https://raw.githubusercontent.com/FLECS-Technologies/flecs-public/main/schema/dos.schema.json',
+            'https://git.flecs.tech/flecs/app-manifest/raw/branch/3.1.0/manifest.schema.json',
+            'https://git.flecs.tech/flecs/flecs-core/raw/branch/main/schema/dos.schema.json',
           ],
         },
       },
