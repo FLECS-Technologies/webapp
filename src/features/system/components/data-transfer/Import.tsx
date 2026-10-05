@@ -43,8 +43,7 @@ interface ImportProps extends React.ComponentProps<'button'> {
 export type ImportHandoffPhase = 'idle' | 'uploading' | 'accepted';
 
 type ImportHandoffState =
-  | { phase: 'idle' }
-  | { phase: Exclude<ImportHandoffPhase, 'idle'>; fileName: string };
+  { phase: 'idle' } | { phase: Exclude<ImportHandoffPhase, 'idle'>; fileName: string };
 
 function ImportHandoff({
   state,

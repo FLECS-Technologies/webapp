@@ -59,8 +59,7 @@ describe('Import dropzone', () => {
 
   it('keeps the customer informed until the restore job is visible', async () => {
     let acceptRestore:
-      | ((response: { status: number; data: { jobId: number } }) => void)
-      | undefined;
+      ((response: { status: number; data: { jobId: number } }) => void) | undefined;
     apiMocks.restoreBackup.mockReturnValue(
       new Promise((resolve) => {
         acceptRestore = resolve;
