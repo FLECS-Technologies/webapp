@@ -1,9 +1,12 @@
 import { defineConfig } from 'orval';
 
+// Pinned flecs-core API spec
+const FLECS_CORE_COMMIT = '211fa9a8cc7133c41765341acf655cc072e60ffd';
+
 export default defineConfig({
   core: {
     input: {
-      target: 'https://git.flecs.tech/flecs/flecs-core/raw/branch/main/api/openapi.yaml',
+      target: `https://git.flecs.tech/flecs/flecs-core/raw/commit/${FLECS_CORE_COMMIT}/api/openapi.yaml`,
       parserOptions: {
         externalRefs: {
           allow: [
